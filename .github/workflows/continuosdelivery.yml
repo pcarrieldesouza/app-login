@@ -1,17 +1,17 @@
-name: Continuos Delivery
+name: Entrega Contínua (após merge)
 on:
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
+    types: [ closed ]
   workflow_dispatch:
 
 jobs:
   empacotar-codigo:
-    name: Empacotar Código (CI/CD)
+    name: Empacotar Código (CD)
+    if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Baixa repositório
+      - name: Baixar repositório
         uses: actions/checkout@v4
       - name: Gerar artefato do código
         uses: actions/upload-artifact@v4
@@ -23,8 +23,9 @@ jobs:
             requirements.txt
             Dockerfile
 
-  construir-e-testar-docker:
-    name: Construir e Testar Docker (CI) / Publicar (CD)
+  construir-e-publicar-docker:
+    name: Construir e Publicar Docker (CD)
+    if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     needs: empacotar-codigo
     permissions:
@@ -37,40 +38,25 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Configurar Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Login no Docker Hub
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}
+        if: ${{ secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Construir imagem Docker
+      - name: Construir e enviar imagem
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
-          tags: "${{ (github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && format('{0}/login-web:latest', secrets.DOCKERHUB_USERNAME) || 'local/login-web:pr' }}"
-
-      - name: Testar container
-        shell: bash
-        run: |
-          IMAGE="${{ (github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && format('{0}/login-web:latest', secrets.DOCKERHUB_USERNAME) || 'local/login-web:pr' }}"
-          docker run -d --rm -p 8000:8000 --name login-web "$IMAGE"
-          for i in {1..20}; do
-            sleep 1
-            if curl -fsS http://127.0.0.1:8000 >/dev/null; then echo "Aplicação respondeu com sucesso"; break; fi
-            if [ "$i" -eq 20 ]; then echo "Aplicação não respondeu a tempo"; docker logs login-web; exit 1; fi
-          done
-          docker logs login-web
-          docker stop login-web
+          push: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+          tags: "${{ (secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && format('{0}/login-web:latest', secrets.DOCKERHUB_USERNAME) || 'local/login-web:latest' }}"
 
   simular-deploy:
     name: Simular Deploy (CD)
+    if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     needs: empacotar-codigo
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/download-artifact@v5
         with:
