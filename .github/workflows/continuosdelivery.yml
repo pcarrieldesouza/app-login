@@ -11,7 +11,7 @@ jobs:
   empacotar-codigo:
     runs-on: ubuntu-latest
     steps:
-      - name: Baixar repositório
+      - name: Baixa repositório
         uses: actions/checkout@v4
 
       - name: Gerar artefato do código
