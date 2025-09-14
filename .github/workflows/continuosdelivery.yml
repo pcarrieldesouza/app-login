@@ -1,3 +1,4 @@
+
 name: Continuous Delivery
 on:
   push:
@@ -71,3 +72,25 @@ jobs:
           done
           docker logs login-web
           docker stop login-web
+
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Simulando Continuos Delivery
+        uses: actions/upload-artifact@v4
+        with:
+            name: projetozipado.zip
+            path: |
+                **.py
+                README.md
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: deliver
+    steps:
+        - uses: actions/download-artifact@v5
+          with:
+            name: projetozipado.zip
+        - name: Display structure of downloaded files
+          run: ls -R
+
