@@ -1,12 +1,78 @@
-name: Continuos Delivery
-on: 
-    push:
-        branches:
-            - main
+
+name: Continuous Delivery
+on:
+  push:
+    branches: [ main ]
+
 jobs:
   deliver:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Upload artifact (código)
+        uses: actions/upload-artifact@v4
+        with:
+          name: projetozipado.zip
+          path: |
+            **/*.py
+            README.md
+            requirements.txt
+            Dockerfile
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: deliver
+    permissions:
+      contents: read
+      packages: write   # necessário se for publicar imagem
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub (optional)
+        if: ${{ secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          # precisa ser booleano:
+          push: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+          # deixe em uma linha e entre aspas para evitar erro de parser:
+          tags: "${{ (secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && format('{0}/login-web:latest', secrets.DOCKERHUB_USERNAME) || 'local/login-web:latest' }}"
+
+      - name: Run container for smoke test
+        shell: bash
+        run: |
+          IMAGE="${{ (secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && format('{0}/login-web:latest', secrets.DOCKERHUB_USERNAME) || 'local/login-web:latest' }}"
+          docker run -d --rm -p 8000:8000 --name login-web "$IMAGE"
+          for i in {1..20}; do
+            sleep 1
+            if curl -fsS http://127.0.0.1:8000 >/dev/null; then
+              echo "App respondeu OK"; break
+            fi
+            if [ "$i" -eq 20 ]; then
+              echo "App não respondeu a tempo"
+              docker logs login-web
+              exit 1
+            fi
+          done
+          docker logs login-web
+          docker stop login-web
+
       - name: Check out repository code
         uses: actions/checkout@v4
 
@@ -27,3 +93,4 @@ jobs:
             name: projetozipado.zip
         - name: Display structure of downloaded files
           run: ls -R
+
