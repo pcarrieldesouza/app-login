@@ -75,7 +75,7 @@ def login():
     if u and USERS.get(u) == p:
         session["user"] = u
         return render_template_string(PAGE, user=u, error=None)
-    return render_template_string(PAGE, user=None, error="Usuário ou senha inválidos.")
+    return render_template_string(PAGE, user=None, error="Usuário ou senha inválido.")
 
 @app.route("/logout", methods=["POST"])
 def logout():
