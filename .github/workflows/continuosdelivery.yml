@@ -1,65 +1,55 @@
-name: Entrega Contínua (após merge)
+name: Continuous Delivery
 on:
-  pull_request:
+  push:
     branches: [ main ]
-    types: [ closed ]
-  workflow_dispatch:
 
 jobs:
-  empacotar-codigo:
-    name: Empacotar Código (CD)
-    if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
+  deliver:
     runs-on: ubuntu-latest
     steps:
-      - name: Baixar repositório
+      - name: Check out repository code
         uses: actions/checkout@v4
-      - name: Gerar artefato do código
+
+      - name: Simulando Continuous Delivery
         uses: actions/upload-artifact@v4
         with:
           name: projetozipado.zip
           path: |
             **/*.py
             README.md
-            requirements.txt
-            Dockerfile
 
-  construir-e-publicar-docker:
-    name: Construir e Publicar Docker (CD)
-    if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
+  deploy:
     runs-on: ubuntu-latest
-    needs: empacotar-codigo
-    permissions:
-      contents: read
-      packages: write
+    needs: deliver
     steps:
-      - name: Baixar repositório
+      - uses: actions/download-artifact@v4
+        with:
+          name: projetozipado.zip
+      - name: Display structure of downloaded files
+        run: ls -R
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
         uses: actions/checkout@v4
-      - name: Configurar QEMU
+
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-      - name: Configurar Buildx
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Login no Docker Hub
-        if: ${{ secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}   # ex.: "seuusuario"
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Construir e enviar imagem
+          
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
-          push: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
-          tags: "${{ (secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && format('{0}/login-web:latest', secrets.DOCKERHUB_USERNAME) || 'local/login-web:latest' }}"
-
-  simular-deploy:
-    name: Simular Deploy (CD)
-    if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
-    needs: empacotar-codigo
-    steps:
-      - uses: actions/download-artifact@v5
-        with:
-          name: projetozipado.zip
-      - name: Listar arquivos do artefato
-        run: ls -R
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/app:latest,${{ secrets.DOCKERHUB_USERNAME }}/app:${{ github.sha }}
+          platforms: linux/amd64
