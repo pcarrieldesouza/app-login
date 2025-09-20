@@ -1,6 +1,7 @@
 import pytest
 from src.main import app  # importa o app definido no main.py
 
+#Teste Unitários 5 testes
 @pytest.fixture()
 def client():
     app.config.update(TESTING=True, SECRET_KEY="testing-secret")
