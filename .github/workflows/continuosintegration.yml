@@ -35,7 +35,7 @@ jobs:
           push: false
           tags: user/app:latest
   testes: 
-    runs-on: ubunt-latest         
+    runs-on: ubuntu-latest        
     steps:
     - uses: actions/checkout@v4
 
