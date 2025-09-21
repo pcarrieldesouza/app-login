@@ -55,6 +55,8 @@ jobs:
       - name: Run pytest
         run: |
           mkdir -p junit coverage_html
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
           pytest tests/test_app.py --doctest-modules \
             --junitxml=junit/test-results.xml \
             --cov=src --cov-report=xml:coverage.xml --cov-report=html:coverage_html
+
