@@ -1,10 +1,8 @@
-# app.py
 from flask import Flask, request, session, render_template_string
 
 app = Flask(__name__)
 app.secret_key = "troque-este-segredo"
 
-# "banco" simples (demo)
 USERS = {
     "admin": "admin123",
     "joao":  "senha123",
@@ -65,7 +63,6 @@ PAGE = """
 
 @app.route("/", methods=["GET"])
 def index():
-    # se logado, mostra "bem-vindo"; se não, mostra formulário
     return render_template_string(PAGE, user=session.get("user"), error=None)
 
 @app.route("/login", methods=["POST"])
